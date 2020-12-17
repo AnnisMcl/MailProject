@@ -108,98 +108,134 @@ def lire_email():
     # we choose the inbox but you can select others
     status, messages = mail.select('inbox')
     messages = int(messages[0])
-    print("Vous avez :"+messages+" messages danbs votre boite mail ")
-    N=input("Entrez le nombre de mail que vous voulez voir :\n")
+    print("Vous avez :"+str(messages)+" messages danbs votre boite mail ")
+    N=int(input("Entrez le nombre de mail que vous voulez voir :\n"))
+
+    if(N>messages):
+        print("Vous ne pouvez pas lire autant de mails")
 
 
-    for i in range(messages, messages - N, -1):
-        # fetch the email message by ID
-        res, msg = mail.fetch(str(i), "(RFC822)")
-        for response in msg:
-            if isinstance(response, tuple):
-                # parse a bytes email into a message object
-                msg = email.message_from_bytes(response[1])
-                # decode the email subject
-                subject, encoding = decode_header(msg["Subject"])[0]
-                if isinstance(subject, bytes):
-                    # if it's a bytes, decode to str
-                    subject = subject.decode(encoding)
-                # decode email sender
-                From, encoding = decode_header(msg.get("From"))[0]
-                if isinstance(From, bytes):
-                    From = From.decode(encoding)
-                print("Subject:", subject)
-                print("From:", From)
-                # if the email message is multipart
-                if msg.is_multipart():
-                    # iterate over email parts
-                    for part in msg.walk():
+    else:
+        for i in range(messages, messages - N, -1):
+            # fetch the email message by ID
+            res, msg = mail.fetch(str(i), "(RFC822)")
+
+            for response in msg:
+                if isinstance(response, tuple):
+                    # parse a bytes email into a message object
+                    msg = email.message_from_bytes(response[1])
+                    # decode the email subject
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        # if it's a bytes, decode to str
+                        subject = subject.decode(encoding)
+                    # decode email sender
+                    From, encoding = decode_header(msg.get("From"))[0]
+                    if isinstance(From, bytes):
+                        From = From.decode(encoding)
+
+                    # if the email message is multipart
+                    if msg.is_multipart():
+                        # iterate over email parts
+                        for part in msg.walk():
+                            # extract content type of email
+                            content_type = part.get_content_type()
+                            content_disposition = str(part.get("Content-Disposition"))
+                            try:
+                                # get the email body
+                                body = part.get_payload(decode=True).decode()
+                                body="From : "+From+"\n"+"Object : "+subject+"\n"+body
+                            except:
+                                pass
+                            if content_type == "text/plain" and "attachment" not in content_disposition:
+                                # print text/plain emails and skip attachments
+                                print(body)
+                                save = input("Voulez vous enregistrer le mail ? (OUI/NON)")
+                                save = save.lower()
+                                if (save == "oui"):
+                                    if content_type == "text/plain":
+                                        # print only text email parts
+                                        print("Enregistement\n")
+                                        folder_name = clean(subject)
+                                        if not os.path.isdir(folder_name):
+                                            # make a folder for this email (named after the subject)
+                                            os.mkdir(folder_name)
+                                        filename = "mail.txt"
+                                        filepath = os.path.join(folder_name, filename)
+                                        # write the file
+                                        open(filepath, "w").write(body)
+                                        print("Enregistrement réussi\n")
+
+
+                            elif "attachment" in content_disposition:
+                                # download attachment
+                                filename = part.get_filename()
+                                if filename:
+                                    folder_name = clean(subject)
+                                    if not os.path.isdir(folder_name):
+                                        # make a folder for this email (named after the subject)
+                                        os.mkdir(folder_name)
+                                    filepath = os.path.join(folder_name, filename)
+                                    # download attachment and save it
+                                    open(filepath, "wb").write(part.get_payload(decode=True))
+                                    filename = "mail.txt"
+                                    filepath = os.path.join(folder_name, filename)
+                                    # write the file
+                                    open(filepath, "w").write(body)
+                    else:
                         # extract content type of email
-                        content_type = part.get_content_type()
-                        content_disposition = str(part.get("Content-Disposition"))
-                        try:
-                            # get the email body
-                            body = part.get_payload(decode=True).decode()
-                        except:
-                            pass
-                        if content_type == "text/plain" and "attachment" not in content_disposition:
-                            # print text/plain emails and skip attachments
-                            print(body)
-                        elif "attachment" in content_disposition:
-                            # download attachment
-                            filename = part.get_filename()
-                            if filename:
+                        content_type = msg.get_content_type()
+                        # get the email body
+                        body = msg.get_payload(decode=True).decode()
+                        save=input("Voulez vous enregistrer le mail ? (OUI/NON)")
+                        save=save.lower()
+                        if(save=="oui"):
+                            if content_type == "text/plain":
+                                # print only text email parts
+                                print("Enregistement")
                                 folder_name = clean(subject)
                                 if not os.path.isdir(folder_name):
                                     # make a folder for this email (named after the subject)
                                     os.mkdir(folder_name)
+                                filename = "mail.pdf"
                                 filepath = os.path.join(folder_name, filename)
-                                # download attachment and save it
-                                open(filepath, "wb").write(part.get_payload(decode=True))
-                else:
-                    # extract content type of email
-                    content_type = msg.get_content_type()
-                    # get the email body
-                    body = msg.get_payload(decode=True).decode()
-                    if content_type == "text/plain":
-                        # print only text email parts
-                        print(body)
-                    if content_type == "text/html":
-                        # if it's HTML, create a new HTML file and open it in browser
-                        folder_name = clean(subject)
-                        if not os.path.isdir(folder_name):
-                            # make a folder for this email (named after the subject)
-                            os.mkdir(folder_name)
-                        filename = "index.html"
-                        filepath = os.path.join(folder_name, filename)
-                        # write the file
-                        open(filepath, "w").write(body)
-                        # open in the default browser
-                        webbrowser.open(filepath)
-                    print("=" * 100)
-    # close the connection and logout
-    mail.close()
-    mail.logout()
+                                # write the file
+                                open(filepath, "w").write(body)
+                                # open in the default browser
+                                webbrowser.open(filepath)
+                            print("=" * 100)
+
+        # close the connection and logout
+        mail.close()
+        mail.logout()
 
 def save_email():
     mail=input("Taper la nouvelle adresse email a enregistrer\n")
     conn = sqlite3.connect('Un_objet/database.db')
     cursor = conn.cursor()
     print(mail)
-    cursor.executemany("INSERT INTO email_address(address) VALUES(?)",(mail))
+    cursor.execute("INSERT INTO email_address(address) VALUES('"+mail+"')")
     print("Adresse email enregistrée dans la base de donnée \n\n\n")
+    conn.commit()
+    
+def enregistre_mail():
+    oui=0
 
+
+    
 if __name__ == '__main__':
     choix = "0"
     while (choix != "4"):
         choix = input(
-            "Que souhaitez-vous faire ? \n1) Envoyer un email \n2) Lire Les x derniers mails \n3) Enregistrez un email \n4) Quittez \n")
+            "Que souhaitez-vous faire ? \n1) Envoyer un email \n2) Lire Les x derniers mails \n3) Enregistrez un email \n4)Enregistrer un mail recu \n5) Quittez \n")
         if choix == "1":
             send_email()
         if choix == "2":
             lire_email()
         if choix == "3":
             save_email()
+        if choix == "4":
+            enregistre_mail()
 
 
 # Create a multipart message and set headers
